@@ -7,6 +7,8 @@ import subprocess
 import pandas as pd
 import numpy as np
 import databaseconfig as cfg
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from myPanels import MyPanels
 from scenariosSelection import ScenariosSelection
 from autoWidthListCtrl import AutoWidthListCtrl
@@ -87,9 +89,12 @@ class MyFrame(wx.Frame):
 
     def onProdClick(self, event):
         self.destroyRightPanel()
+        self.destroyScenarioPanel()
         self.createRightPanel()
-        #self.rightpanel.SetBackgroundColour("yellow")
+        self.createScenarioPanel()
+        #self.rightpanel.SetBackgroundColour("blue")
         self.basicsizer.Add(self.rightpanel, proportion=2, flag=wx.EXPAND)
+        self.basicsizer.Add(self.scenariopanel, proportion=2, flag=wx.EXPAND)
 
         self.btn4 = wx.Button(self.rightpanel, 4, 'Run', (20, 120))
         self.rpText = wx.StaticText(self.rightpanel, 1, "Welcome to Production panel!", (10, 20))
@@ -122,9 +127,12 @@ class MyFrame(wx.Frame):
 
     def onDevClick(self, event):
         self.destroyRightPanel()
+        self.destroyScenarioPanel()
         self.createRightPanel()
-        #self.rightpanel.SetBackgroundColour("green")
+        self.createScenarioPanel()
+        #self.rightpanel.SetBackgroundColour("blue")
         self.basicsizer.Add(self.rightpanel, proportion=2, flag=wx.EXPAND)
+        self.basicsizer.Add(self.scenariopanel, proportion=2, flag=wx.EXPAND)
 
         self.btn4 = wx.Button(self.rightpanel, 4, 'Run', (20, 120))
         self.rpText = wx.StaticText(self.rightpanel, 1, "Welcome to Development panel!", (10, 20))
@@ -168,20 +176,24 @@ class MyFrame(wx.Frame):
         self.btn5 = wx.Button(self.rightpanel, 5, 'RunRscript', pos=(120, 150))
         self.btn6 = wx.Button(self.rightpanel, 6, 'RunAnalysis', pos=(220, 150))
         self.rpText = wx.StaticText(self.rightpanel, 1, "Welcome to QA panel!", (100, 20))
-        self.rStartLabel = wx.StaticText(self.rightpanel, 2, "Start Date:", (10, 50))
-        self.rEndLabel = wx.StaticText(self.rightpanel, 3, "End Date:", (10, 80))
-        self.rStartDate = wx.TextCtrl(self.rightpanel, 2, wx.EmptyString, pos=(100, 50), size=(120, -1))
-        self.rEndDate = wx.TextCtrl(self.rightpanel, 3, wx.EmptyString, pos=(100, 80), size=(120, -1))
+        self.rBusinessLabel = wx.StaticText(self.rightpanel, 2, "Business Date:", (10, 50))
+        self.rLiqLabel = wx.StaticText(self.rightpanel, 3, "Liquidity Period:", (10, 80))
+        self.rLbackLabel = wx.StaticText(self.rightpanel, 4, "Look Back Period:", (10, 110))
+        self.rBusinessDate = wx.TextCtrl(self.rightpanel, 2, wx.EmptyString, pos=(150, 50), size=(120, -1))
+        self.rLiqidity = wx.TextCtrl(self.rightpanel, 3, wx.EmptyString, pos=(150, 80), size=(120, -1))
+        self.rLookBack = wx.TextCtrl(self.rightpanel, 4, wx.EmptyString, pos=(150, 110), size=(120, -1))
 
         self.pvSizer = wx.BoxSizer(wx.VERTICAL)
         self.hs1 = wx.BoxSizer(wx.HORIZONTAL)
         self.hs2 = wx.BoxSizer(wx.HORIZONTAL)
         self.hs3 = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.hs1.Add(self.rStartLabel, 2, wx.ALIGN_LEFT)
-        self.hs1.Add(self.rStartDate, 2, wx.ALIGN_RIGHT)
-        self.hs2.Add(self.rEndLabel, 3, wx.ALIGN_LEFT)
-        self.hs2.Add(self.rEndDate, 3, wx.ALIGN_RIGHT)
+        self.hs1.Add(self.rBusinessLabel, 2, wx.ALIGN_LEFT)
+        self.hs1.Add(self.rBusinessDate, 2, wx.ALIGN_RIGHT)
+        self.hs2.Add(self.rLiqLabel, 3, wx.ALIGN_LEFT)
+        self.hs2.Add(self.rLiqidity, 3, wx.ALIGN_RIGHT)
+        self.hs2.Add(self.rLbackLabel, 4, wx.ALIGN_LEFT)
+        self.hs2.Add(self.rLookBack, 4, wx.ALIGN_RIGHT)
         self.hs3.Add(self.btn4, proportion = 0, flag = wx.ALIGN_LEFT)
         self.hs3.Add(self.btn5, proportion = 1, flag = wx.ALIGN_LEFT)
         self.hs3.Add(self.btn6, proportion = 2, flag = wx.ALIGN_LEFT)
@@ -320,19 +332,26 @@ class MyFrame(wx.Frame):
         return rtext
 
     def onClickQARunProc(self, event):
-        startDate = self.rStartDate.GetValue()
-        endDate = self.rEndDate.GetValue()
+        endDate = self.rBusinessDate.GetValue()
+        liquidityPeriod = self.rLiqidity.GetValue()
+        lookBack = self.rLookBack.GetValue()
+        dates = endDate.split('-')
+        ddate = str(int(dates[0]) - int(lookBack))
+        startDate = '-'.join([ddate, dates[1], dates[2]])
+        #print "businessdate: ", endDate
+        #print "endDate: ", startDate
 
-        if not startDate or not endDate:
+        if not endDate or not startDate:
             wx.MessageBox('Operation could not be completed, please enter required date...', 'Warning', wx.OK | wx.ICON_WARNING)
             return
 
-        dlg = wx.MessageDialog(None, "Stress run is running from " + startDate + " to " + endDate + ". Do you want to continue?", 'RUN Dialog', wx.YES_NO | wx.ICON_QUESTION)
+        dlg = wx.MessageDialog(None, "Stress run is running from " + endDate + " to " + startDate + ". Do you want to continue?", 'RUN Dialog', wx.YES_NO | wx.ICON_QUESTION)
         result = dlg.ShowModal()
 
         if result == wx.ID_YES:
-            self.rStartDate.SetValue('')
-            self.rEndDate.SetValue('')
+            self.rBusinessDate.SetValue('')
+            self.rLiqidity.SetValue('')
+            self.rLookBack.SetValue('')
             
             self.destroyBottonPanel()
             self.createBottomPanel()
@@ -348,17 +367,39 @@ class MyFrame(wx.Frame):
 
             self.list = AutoWidthListCtrl(self.bottompanel)
             self.list.InsertColumn(0, 'Date', wx.LIST_FORMAT_CENTER)
-            self.list.InsertColumn(1, 'Term', wx.LIST_FORMAT_CENTER)
-            self.list.InsertColumn(2, 'Yield', wx.LIST_FORMAT_CENTER)
+            self.list.InsertColumn(1, 'y1', wx.LIST_FORMAT_CENTER)
+            self.list.InsertColumn(2, 'y2', wx.LIST_FORMAT_CENTER)
+            self.list.InsertColumn(3, 'y3', wx.LIST_FORMAT_CENTER)
+            self.list.InsertColumn(4, 'y5', wx.LIST_FORMAT_CENTER)
+            self.list.InsertColumn(5, 'y7', wx.LIST_FORMAT_CENTER)
+            self.list.InsertColumn(6, 'y10', wx.LIST_FORMAT_CENTER)
+            self.list.InsertColumn(7, 'y20', wx.LIST_FORMAT_CENTER)
+            self.list.InsertColumn(8, 'y30', wx.LIST_FORMAT_CENTER)
 
             for idx, row in df.iterrows():
                 date = row['dt']
-                term = row['term']
-                yld = row['yield']
+                #term = row['term']
+                #yld = row['yield']
+                y1 = row['y1']
+                y2 = row['y2']
+                y3 = row['y3']
+                y5 = row['y5']
+                y7 = row['y7']
+                y10 = row['y10']
+                y20 = row['y20']
+                y30 = row['y30']
+
+
 
                 index = self.list.InsertStringItem(sys.maxint, str(date))
-                self.list.SetStringItem(index, 1, str(term))
-                self.list.SetStringItem(index, 2, str(yld))
+                self.list.SetStringItem(index, 1, str(y1))
+                self.list.SetStringItem(index, 2, str(y2))
+                self.list.SetStringItem(index, 3, str(y3))
+                self.list.SetStringItem(index, 4, str(y5))
+                self.list.SetStringItem(index, 5, str(y7))
+                self.list.SetStringItem(index, 6, str(y10))
+                self.list.SetStringItem(index, 7, str(y20))
+                self.list.SetStringItem(index, 8, str(y30))
 
             self.hbox = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -382,10 +423,13 @@ def getDataFromTable(startDate, endDate):
                       )   
 
     # sql query
-    stmt = "SELECT * FROM yld_crv_hist_v WHERE dt > '" + startDate + "' and dt < '" + endDate + "'"
-
+    #stmt = "SELECT * FROM yld_crv_hist_v WHERE dt > '" + startDate + "' and dt < '" + endDate + "'"
+    
+    stmt = "EXEC s_SGD_CPA_raw_data_R @bus_dt = '{0}', @liq_period = {1}, @look_back_period = {2}".format('1990-01-10', 10, 5)
+    #stmt = "EXEC s_SGD_CPA_raw_data_R @bus_dt = '1990-01-10', @liq_period = 10, @look_back_period = 5".format(my_proc)
+    #print stmt
     # Excute Query here
-    df = pd.read_sql(stmt, conn)
+    df = pd.read_sql_query(stmt, conn)
     if df is not None:
         #print df.head(5)
         return df
